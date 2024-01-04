@@ -4,6 +4,7 @@ use muda::{
     AboutMetadata, ContextMenu, IconMenuItem, Menu, MenuEvent, MenuId, PredefinedMenuItem, Submenu,
 };
 use winit::{
+    dpi::LogicalSize,
     error::EventLoopError,
     event::{ElementState, Event, MouseButton, WindowEvent},
     event_loop::{EventLoop, EventLoopBuilder, EventLoopWindowTarget},
@@ -19,8 +20,46 @@ use winit::platform::windows::EventLoopBuilderExtWindows;
 
 type DispatchMap = HashMap<MenuId, Box<dyn Fn()>>;
 
+pub struct AppBuilder {
+    app_name: String,
+    window_title: String,
+    window_width: u32,
+    window_height: u32,
+}
+
+impl AppBuilder {
+    pub fn new(app_name: &str) -> Self {
+        Self {
+            app_name: app_name.to_string(),
+            window_title: app_name.to_string(),
+            window_width: 320,
+            window_height: 240,
+        }
+    }
+
+    pub fn with_window_title(mut self, window_title: &str) -> Self {
+        self.window_title = window_title.to_string();
+        self
+    }
+
+    pub fn with_window_size(mut self, width: u32, height: u32) -> Self {
+        self.window_width = width;
+        self.window_height = height;
+        self
+    }
+
+    pub fn build(self) -> Result<App, Box<dyn std::error::Error>> {
+        App::new(
+            self.app_name,
+            self.window_title,
+            self.window_width,
+            self.window_height,
+        )
+    }
+}
+
 pub struct App {
-    window: Window,
+    pub window: Window,
     menu_bar: Menu,
     context_menu: Submenu,
     menu_dispatch_map: DispatchMap,
@@ -31,13 +70,21 @@ impl App {
     /// Create new App with a menu bar.
     /// This function is platform-specific, and should only be called once.
     /// It should be called before any other menu-related functions.
-    pub fn new(app_name: String) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(
+        app_name: String,
+        window_title: String,
+        width: u32,
+        height: u32,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut event_loop_builder = EventLoopBuilder::new();
         let mut menu_bar = Self::create_menu_bar(&mut event_loop_builder)?;
         let event_loop = event_loop_builder.build()?;
 
+        let size = LogicalSize::new(width, height);
         let window = WindowBuilder::new()
-            .with_title(app_name.to_string())
+            .with_title(window_title)
+            .with_inner_size(size)
+            .with_min_inner_size(size)
             .build(&event_loop)?;
 
         let menu_dispatch_map = Self::create_menu_items(&mut menu_bar, &app_name)?;
@@ -229,6 +276,7 @@ impl App {
         event_loop.run(move |event, event_loop| {
             self.handle_window_event(&event, event_loop);
             event_handler(event, event_loop);
+            self.window.request_redraw();
         })
     }
 }
